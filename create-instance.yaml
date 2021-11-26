@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create vpc,subnet, securityGroup and so on except ec2 instance  [only thing that you need to do is create ec2 instance]
+Parameters:
+  KeyName:
+    Description: "The EC2 key pair to allow SSH access to instance"
+    Type: AWS::EC2::KeyPair::KeyName
+  MyIP: #������IP�A�h���X
+    Description: IP address allowed to access EC2 /221.244.127.226/32
+    Type: String
+
+# need to replacement downbelow (to change eache name)
+# VPC: vpc-template
+# Public Subnet: public-subnet-template
+# Internet Gateway: Internet-gateway-template
+# Route Table: FrontendRouteTable-template
+# Route: FrontendRoute-template
+# Public Security Group: Frontend-Seurity-Group-template
+
+Resources:
+#---------------------------
+# VPC
+#---------------------------
+  FirstVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+      - Key: Name
+        Value: vpc-template
+
+#---------------------------
+# InternetGateway
+#---------------------------
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: Internet-gateway-template
+
+# to attach vpc
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref FirstVPC
+      InternetGatewayId: !Ref InternetGateway
+
+#---------------------------
+# public Route Table
+#---------------------------
+  FrontendRouteTable:
+    Type: AWS::EC2::RouteTable
+    DependsOn: AttachGateway
+    Properties:
+      VpcId: !Ref FirstVPC
+      Tags:
+      - Key: Name
+        Value: FrontendRouteTable-template
+
+# routing between internet and public Route Table
+  FrontendRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref FrontendRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+#---------------------------
+# Public Subnet
+#---------------------------
+  FrontendSubnet1:
+    Type: AWS::EC2::Subnet
+    DependsOn: AttachGateway
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref FirstVPC
+      Tags:
+      - Key: Name
+        Value: public-subnet-template
+
+  FrontendSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FrontendSubnet1
+      RouteTableId: !Ref FrontendRouteTable
+
+#---------------------------
+# Frontend security group
+#---------------------------
+  FrontendEc2SG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: Frontend-Seurity-Group-template
+      GroupDescription: Allow SSH and HTTP access only MyIP
+      VpcId: !Ref FirstVPC
+      Tags:
+      - Key: Name
+        Value: Frontend-Seurity-Group-template
+      SecurityGroupIngress:
+        # http
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref MyIP
+        # ssh
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
